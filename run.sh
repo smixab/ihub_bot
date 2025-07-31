@@ -4,6 +4,16 @@
 echo "🤖 Starting iHub Bot - School Assistant Chatbot"
 echo "================================================"
 
+# Detect macOS and apply fixes if needed
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "🍎 macOS detected"
+    if [[ $(uname -m) == "arm64" ]]; then
+        echo "🚀 Apple Silicon (M1/M2) detected"
+        export PYTORCH_ENABLE_MPS_FALLBACK=1
+        export OMP_NUM_THREADS=1
+    fi
+fi
+
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
     echo "❌ Python 3 is not installed. Please install Python 3.8 or higher."
@@ -59,5 +69,11 @@ echo "📱 Open your browser and go to: http://localhost:5000"
 echo "⏹️  Press Ctrl+C to stop the server"
 echo ""
 
-# Start the Flask application
-python app.py
+# Start the Flask application with appropriate settings for macOS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "🍎 Starting with macOS optimizations..."
+    # Suppress common macOS warnings and run with single thread for stability
+    python -W ignore::UserWarning -W ignore::FutureWarning app.py
+else
+    python app.py
+fi

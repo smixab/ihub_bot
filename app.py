@@ -26,7 +26,16 @@ app = Flask(__name__)
 CORS(app)
 
 # Initialize sentence transformer model for semantic search
-model = SentenceTransformer('all-MiniLM-L6-v2')
+model = None
+try:
+    if not os.getenv('DISABLE_EMBEDDINGS'):
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        print("✅ Sentence transformer model loaded successfully")
+    else:
+        print("⚠️ Embeddings disabled - using simple keyword search")
+except Exception as e:
+    print(f"⚠️ Could not load sentence transformer model: {e}")
+    print("📝 Falling back to simple keyword search")
 
 class SchoolKnowledgeBase:
     def __init__(self):
@@ -134,51 +143,98 @@ class SchoolKnowledgeBase:
     
     def create_embeddings(self):
         """Create embeddings for all tools in the knowledge base"""
-        if not self.tools_data:
+        if not self.tools_data or not model:
+            print("⚠️ Skipping embeddings creation - model not available")
             return
         
-        # Create text representations of each tool
-        texts = []
-        for tool in self.tools_data:
-            text = f"{tool['name']} {tool['category']} {tool['description']} {' '.join(tool['keywords'])}"
-            texts.append(text)
-        
-        # Generate embeddings
-        self.embeddings = model.encode(texts)
-        
-        # Create FAISS index
-        dimension = self.embeddings.shape[1]
-        self.index = faiss.IndexFlatIP(dimension)
-        
-        # Normalize embeddings for cosine similarity
-        faiss.normalize_L2(self.embeddings)
-        self.index.add(self.embeddings)
-        
-        # Save embeddings and index
-        with open('embeddings.pkl', 'wb') as f:
-            pickle.dump(self.embeddings, f)
-        faiss.write_index(self.index, 'faiss_index.idx')
+        try:
+            # Create text representations of each tool
+            texts = []
+            for tool in self.tools_data:
+                text = f"{tool['name']} {tool['category']} {tool['description']} {' '.join(tool['keywords'])}"
+                texts.append(text)
+            
+            # Generate embeddings
+            self.embeddings = model.encode(texts)
+            
+            # Create FAISS index
+            import faiss
+            dimension = self.embeddings.shape[1]
+            self.index = faiss.IndexFlatIP(dimension)
+            
+            # Normalize embeddings for cosine similarity
+            faiss.normalize_L2(self.embeddings)
+            self.index.add(self.embeddings)
+            
+            # Save embeddings and index
+            with open('embeddings.pkl', 'wb') as f:
+                pickle.dump(self.embeddings, f)
+            faiss.write_index(self.index, 'faiss_index.idx')
+            print("✅ Embeddings created successfully")
+        except Exception as e:
+            print(f"⚠️ Could not create embeddings: {e}")
+            self.embeddings = None
+            self.index = None
     
     def search_tools(self, query, top_k=5):
-        """Search for tools using semantic similarity"""
-        if not self.index or not self.tools_data:
+        """Search for tools using semantic similarity or keyword fallback"""
+        # Try semantic search first
+        if self.index and self.tools_data and model:
+            try:
+                # Generate embedding for query
+                query_embedding = model.encode([query])
+                import faiss
+                faiss.normalize_L2(query_embedding)
+                
+                # Search
+                scores, indices = self.index.search(query_embedding, min(top_k, len(self.tools_data)))
+                
+                results = []
+                for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
+                    if idx < len(self.tools_data):
+                        tool = self.tools_data[idx].copy()
+                        tool['relevance_score'] = float(score)
+                        results.append(tool)
+                
+                return results
+            except Exception as e:
+                print(f"⚠️ Semantic search failed: {e}, falling back to keyword search")
+        
+        # Fallback to simple keyword search
+        return self.simple_keyword_search(query, top_k)
+    
+    def simple_keyword_search(self, query, top_k=5):
+        """Simple keyword-based search as fallback"""
+        if not self.tools_data:
             return []
         
-        # Generate embedding for query
-        query_embedding = model.encode([query])
-        faiss.normalize_L2(query_embedding)
-        
-        # Search
-        scores, indices = self.index.search(query_embedding, min(top_k, len(self.tools_data)))
-        
+        query_lower = query.lower()
         results = []
-        for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
-            if idx < len(self.tools_data):
-                tool = self.tools_data[idx].copy()
-                tool['relevance_score'] = float(score)
-                results.append(tool)
         
-        return results
+        for tool in self.tools_data:
+            score = 0
+            search_text = f"{tool['name']} {tool['category']} {tool['description']} {' '.join(tool['keywords'])}".lower()
+            
+            # Simple scoring based on keyword matches
+            query_words = query_lower.split()
+            for word in query_words:
+                if len(word) > 2:  # Skip very short words
+                    if word in search_text:
+                        score += 1
+                        # Bonus for matches in name or category
+                        if word in tool['name'].lower():
+                            score += 2
+                        if word in tool['category'].lower():
+                            score += 1
+            
+            if score > 0:
+                tool_copy = tool.copy()
+                tool_copy['relevance_score'] = score
+                results.append(tool_copy)
+        
+        # Sort by score and return top results
+        results.sort(key=lambda x: x['relevance_score'], reverse=True)
+        return results[:top_k]
 
 # Initialize knowledge base
 kb = SchoolKnowledgeBase()
