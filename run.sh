@@ -22,7 +22,20 @@ if [ -f "requirements.txt" ]; then
     pip install -r requirements.txt
     if [ $? -ne 0 ]; then
         echo "❌ Failed to install dependencies."
-        exit 1
+        echo "🔧 Trying to fix HuggingFace compatibility issues..."
+        if [ -f "fix_huggingface.py" ]; then
+            python3 fix_huggingface.py
+        else
+            echo "⚠️  Running manual fix..."
+            pip uninstall -y sentence-transformers huggingface_hub transformers
+            pip install huggingface_hub==0.19.4 transformers==4.36.2 sentence-transformers==2.6.1
+        fi
+        echo "📦 Retrying dependency installation..."
+        pip install -r requirements.txt
+        if [ $? -ne 0 ]; then
+            echo "❌ Still failed. Please run: python3 fix_huggingface.py"
+            exit 1
+        fi
     fi
 else
     echo "⚠️  requirements.txt not found. Make sure you're in the correct directory."
