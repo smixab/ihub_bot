@@ -50,14 +50,14 @@ class SchoolKnowledgeBase:
             "tools": [
                 {
                     "id": 1,
-                    "name": "3D Printer",
+                    "name": "3D Printers (Bambu Lab X1C)",
                     "category": "Fabrication",
                     "location": "Maker Space - Room 101",
-                    "description": "Ultimaker S3 3D printer for prototyping and creating plastic parts",
+                    "description": "Three Bambu Lab X1C 3D printers for high-quality prototyping and creating plastic parts with automatic multi-material capabilities",
                     "availability": "Available during lab hours (9 AM - 5 PM)",
                     "training_required": True,
                     "contact": "Dr. Smith - ext. 1234",
-                    "keywords": ["3d printing", "prototyping", "plastic", "maker", "fabrication"]
+                    "keywords": ["3d printing", "prototyping", "plastic", "maker", "fabrication", "bambu lab", "x1c", "multi-material", "ams"]
                 },
                 {
                     "id": 2,
