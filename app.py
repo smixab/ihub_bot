@@ -12,6 +12,14 @@ from datetime import datetime
 import time
 from moderation import moderation
 
+# Import Gemini integration
+try:
+    from gemini_integration import GeminiChatbot
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("Gemini integration not available. Install google-generativeai to use Gemini.")
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -175,6 +183,28 @@ class SchoolKnowledgeBase:
 # Initialize knowledge base
 kb = SchoolKnowledgeBase()
 
+# Initialize AI providers
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'fallback').lower()  # 'openai', 'gemini', or 'fallback'
+gemini_chatbot = None
+
+# Initialize Gemini if available and configured
+if GEMINI_AVAILABLE and AI_PROVIDER == 'gemini' and os.getenv('GEMINI_API_KEY'):
+    try:
+        gemini_chatbot = GeminiChatbot(
+            model_name=os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+        )
+        print(f"✅ Gemini initialized successfully with model: {gemini_chatbot.model_name}")
+    except Exception as e:
+        print(f"❌ Failed to initialize Gemini: {e}")
+        AI_PROVIDER = 'fallback'
+
+# School information for AI context
+SCHOOL_INFO = {
+    'name': os.getenv('SCHOOL_NAME', 'Educational Institution'),
+    'type': os.getenv('SCHOOL_TYPE', 'School'),
+    'focus': os.getenv('SCHOOL_FOCUS', 'Technology and Engineering')
+}
+
 @app.route('/')
 def index():
     """Serve the main chatbot interface"""
@@ -218,28 +248,8 @@ def chat():
                 context += f"Training Required: {'Yes' if tool['training_required'] else 'No'}\n"
                 context += f"Contact: {tool['contact']}\n\n"
         
-        context += f"User question: {user_message}\n\n"
-        context += "Please provide a helpful response based on the information above. If you found relevant tools, mention them specifically. Be conversational and helpful."
-        
-        # Generate AI response (fallback if no OpenAI key)
-        if os.getenv('OPENAI_API_KEY'):
-            try:
-                client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": context},
-                        {"role": "user", "content": user_message}
-                    ],
-                    max_tokens=500,
-                    temperature=0.7
-                )
-                ai_response = response.choices[0].message.content
-            except Exception as e:
-                print(f"OpenAI API error: {e}")
-                ai_response = generate_fallback_response(user_message, relevant_tools)
-        else:
-            ai_response = generate_fallback_response(user_message, relevant_tools)
+        # Generate AI response based on configured provider
+        ai_response = generate_ai_response(user_message, relevant_tools, context)
         
         return jsonify({
             'response': ai_response,
@@ -251,8 +261,70 @@ def chat():
         print(f"Error in chat endpoint: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+def generate_ai_response(user_message, relevant_tools, basic_context=""):
+    """Generate AI response using the configured provider (Gemini, OpenAI, or fallback)"""
+    global AI_PROVIDER, gemini_chatbot
+    
+    # Try Gemini first if configured
+    if AI_PROVIDER == 'gemini' and gemini_chatbot:
+        try:
+            # Create context for Gemini
+            context = gemini_chatbot.create_school_context(relevant_tools)
+            
+            # Generate response
+            response_data = gemini_chatbot.generate_response(
+                user_message=user_message,
+                context=context,
+                school_info=SCHOOL_INFO
+            )
+            
+            if response_data['success']:
+                return response_data['response']
+            else:
+                print(f"Gemini error: {response_data.get('error', 'Unknown error')}")
+                # Fall through to OpenAI or fallback
+        except Exception as e:
+            print(f"Gemini API error: {e}")
+            # Fall through to OpenAI or fallback
+    
+    # Try OpenAI as backup
+    if AI_PROVIDER in ['openai', 'fallback'] and os.getenv('OPENAI_API_KEY'):
+        try:
+            context = f"You are a helpful assistant for students at {SCHOOL_INFO['name']}. You help them find tools, locations, and information.\n\n"
+            
+            if relevant_tools:
+                context += "Here are some relevant tools/resources I found:\n\n"
+                for tool in relevant_tools:
+                    context += f"**{tool['name']}** ({tool['category']})\n"
+                    context += f"Location: {tool['location']}\n"
+                    context += f"Description: {tool['description']}\n"
+                    context += f"Availability: {tool['availability']}\n"
+                    context += f"Training Required: {'Yes' if tool['training_required'] else 'No'}\n"
+                    context += f"Contact: {tool['contact']}\n\n"
+            
+            context += f"User question: {user_message}\n\n"
+            context += "Please provide a helpful response based on the information above. If you found relevant tools, mention them specifically. Be conversational and helpful."
+            
+            client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": context},
+                    {"role": "user", "content": user_message}
+                ],
+                max_tokens=500,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"OpenAI API error: {e}")
+            # Fall through to basic fallback
+    
+    # Use basic fallback response
+    return generate_fallback_response(user_message, relevant_tools)
+
 def generate_fallback_response(user_message, relevant_tools):
-    """Generate a response when OpenAI API is not available"""
+    """Generate a response when AI APIs are not available"""
     if not relevant_tools:
         return "I couldn't find any specific tools matching your request. You might want to contact the main office at ext. 0000 for more information, or try rephrasing your question with different keywords."
     
