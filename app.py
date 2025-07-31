@@ -9,6 +9,8 @@ import faiss
 import numpy as np
 import pickle
 from datetime import datetime
+import time
+from moderation import moderation
 
 load_dotenv()
 
@@ -181,12 +183,24 @@ def index():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """Handle chat messages and return AI responses"""
+    start_time = time.time()
+    
     try:
         data = request.get_json()
         user_message = data.get('message', '')
         
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
+        
+        # Moderate the message
+        moderation_result = moderation.moderate_message(user_message)
+        
+        if not moderation_result['allowed']:
+            return jsonify({
+                'error': moderation_result['message'],
+                'reason': moderation_result['reason'],
+                'retry_after': moderation_result.get('retry_after')
+            }), 429 if moderation_result['reason'] == 'rate_limited' else 403
         
         # Search knowledge base
         relevant_tools = kb.search_tools(user_message, top_k=3)
@@ -280,6 +294,103 @@ def get_categories():
     """Get all unique categories"""
     categories = list(set(tool['category'] for tool in kb.tools_data))
     return jsonify({'categories': sorted(categories)})
+
+# Admin routes for moderation and monitoring
+@app.route('/admin')
+def admin_dashboard():
+    """Admin dashboard for monitoring and moderation"""
+    return render_template('admin.html')
+
+@app.route('/api/admin/stats', methods=['GET'])
+def get_admin_stats():
+    """Get overall moderation statistics"""
+    try:
+        stats = moderation.get_user_stats()
+        recent_activity = moderation.get_recent_activity(hours=24, limit=50)
+        
+        return jsonify({
+            'stats': stats,
+            'recent_activity': recent_activity
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/user/<ip>', methods=['GET'])
+def get_user_info(ip):
+    """Get detailed information about a specific user"""
+    try:
+        user_stats = moderation.get_user_stats(ip)
+        return jsonify({'user': user_stats})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/block', methods=['POST'])
+def block_user():
+    """Block a user"""
+    try:
+        data = request.get_json()
+        ip = data.get('ip')
+        reason = data.get('reason', 'Manual block by admin')
+        duration = data.get('duration_hours', 24)
+        
+        if not ip:
+            return jsonify({'error': 'IP address required'}), 400
+        
+        moderation.block_user(ip, reason, duration, 'admin')
+        return jsonify({'success': True, 'message': f'User {ip} blocked for {duration} hours'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/unblock', methods=['POST'])
+def unblock_user():
+    """Unblock a user"""
+    try:
+        data = request.get_json()
+        ip = data.get('ip')
+        
+        if not ip:
+            return jsonify({'error': 'IP address required'}), 400
+        
+        moderation.unblock_user(ip, 'admin')
+        return jsonify({'success': True, 'message': f'User {ip} unblocked'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/config', methods=['GET', 'POST'])
+def manage_moderation_config():
+    """Get or update moderation configuration"""
+    try:
+        if request.method == 'GET':
+            return jsonify({'config': moderation.config})
+        else:
+            data = request.get_json()
+            moderation.config.update(data)
+            moderation.save_config()
+            return jsonify({'success': True, 'config': moderation.config})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/bad-words', methods=['GET', 'POST'])
+def manage_bad_words():
+    """Get or update bad words list"""
+    try:
+        if request.method == 'GET':
+            return jsonify({
+                'words': moderation.bad_words,
+                'patterns': moderation.bad_patterns
+            })
+        else:
+            data = request.get_json()
+            if 'words' in data:
+                moderation.bad_words = data['words']
+            if 'patterns' in data:
+                moderation.bad_patterns = data['patterns']
+            moderation.save_bad_words()
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

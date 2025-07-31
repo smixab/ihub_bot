@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iHub Bot - Admin Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #dc2626;
+            --primary-dark: #b91c1c;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --background-color: #f8fafc;
+            --surface-color: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .admin-header h1 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--surface-color);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .stat-icon {
+            float: right;
+            font-size: 1.5rem;
+            opacity: 0.6;
+        }
+
+        .admin-section {
+            background: var(--surface-color);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .activity-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .activity-table th,
+        .activity-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .activity-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            background-color: var(--background-color);
+        }
+
+        .activity-table tr:hover {
+            background-color: var(--background-color);
+        }
+
+        .flag-badge {
+            background-color: var(--danger-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .normal-badge {
+            background-color: var(--success-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .blocked-badge {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgb(220 38 38 / 0.1);
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--surface-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .error {
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #16a34a;
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h1>
+            <i class="fas fa-shield-alt"></i>
+            iHub Bot - Admin Dashboard
+        </h1>
+    </div>
+
+    <div class="admin-container">
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <i class="fas fa-users stat-icon"></i>
+                <h3>Total Users</h3>
+                <p class="stat-value" id="total-users">-</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-comments stat-icon"></i>
+                <h3>Total Messages</h3>
+                <p class="stat-value" id="total-messages">-</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-flag stat-icon"></i>
+                <h3>Flagged Messages</h3>
+                <p class="stat-value" id="flagged-messages">-</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-ban stat-icon"></i>
+                <h3>Blocked Users</h3>
+                <p class="stat-value" id="blocked-users">-</p>
+            </div>
+        </div>
+
+        <!-- Main Admin Sections -->
+        <div class="admin-section">
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('activity')">Recent Activity</div>
+                <div class="tab" onclick="showTab('moderation')">User Management</div>
+                <div class="tab" onclick="showTab('config')">Configuration</div>
+            </div>
+
+            <!-- Recent Activity Tab -->
+            <div id="activity-tab" class="tab-content active">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-history"></i>
+                        Recent User Activity
+                    </h2>
+                    <button class="btn btn-secondary" onclick="refreshActivity()">
+                        <i class="fas fa-refresh"></i>
+                        Refresh
+                    </button>
+                </div>
+                <div id="activity-content">
+                    <div class="loading">Loading activity...</div>
+                </div>
+            </div>
+
+            <!-- User Management Tab -->
+            <div id="moderation-tab" class="tab-content">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-user-shield"></i>
+                        User Management
+                    </h2>
+                    <button class="btn btn-primary" onclick="showBlockUserModal()">
+                        <i class="fas fa-ban"></i>
+                        Block User
+                    </button>
+                </div>
+                <div id="moderation-content">
+                    <div class="form-group">
+                        <label for="user-search">Search User by IP Address:</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="user-search" placeholder="Enter IP address...">
+                            <button class="btn btn-secondary" onclick="searchUser()">
+                                <i class="fas fa-search"></i>
+                                Search
+                            </button>
+                        </div>
+                    </div>
+                    <div id="user-search-results"></div>
+                </div>
+            </div>
+
+            <!-- Configuration Tab -->
+            <div id="config-tab" class="tab-content">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-cog"></i>
+                        Moderation Configuration
+                    </h2>
+                    <button class="btn btn-primary" onclick="saveConfig()">
+                        <i class="fas fa-save"></i>
+                        Save Changes
+                    </button>
+                </div>
+                <div id="config-content">
+                    <div class="loading">Loading configuration...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Block User Modal -->
+    <div id="block-user-modal" class="modal">
+        <div class="modal-content">
+            <h2>Block User</h2>
+            <div class="form-group">
+                <label for="block-ip">IP Address:</label>
+                <input type="text" id="block-ip" placeholder="Enter IP address">
+            </div>
+            <div class="form-group">
+                <label for="block-reason">Reason:</label>
+                <textarea id="block-reason" placeholder="Enter reason for blocking..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="block-duration">Duration (hours):</label>
+                <select id="block-duration">
+                    <option value="1">1 hour</option>
+                    <option value="6">6 hours</option>
+                    <option value="24" selected>24 hours</option>
+                    <option value="72">72 hours</option>
+                    <option value="168">1 week</option>
+                    <option value="720">1 month</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="blockUser()">
+                    <i class="fas fa-ban"></i>
+                    Block User
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>
